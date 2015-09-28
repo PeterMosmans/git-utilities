@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+
+"""
+Validates files when they are received and before they are updated
+by a git repository
+
+Copyright (C) 2015 Peter Mosmans [Go Forward]
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+"""
+
+
+import subprocess
+import sys
+import xml.sax
+
+# When set to True, the update will be rejected when validation fails
+reject = True
+
+
+def main():
+    """Receives hook parameters from git."""
+    (base, commit, ref) = sys.stdin.read().strip().split()
+    sys.exit(validate_files(received_files(base, commit), commit) and reject)
+
+
+def received_files(base, commit):
+    """Rturns a list of all received files."""
+    cmd = ['git', 'diff', '--numstat', '--name-only',
+           '{0}..{1}'.format(base, commit)]
+    p = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+    return p.stdout.read().splitlines()
+
+
+def validate_files(filenames, commit):
+    """Checks file extensions and calls appropriate validator function."""
+    return_value = 0
+    for filename in filenames:
+        if (filename.lower().endswith('.xml') or
+                filename.lower().endswith('xml"')):
+            return_value = validate_xml_file(filename, commit) or return_value
+    return return_value
+
+
+def validate_xml_file(filename, commit):
+    """Validates XML file by trying to parse it."""
+    return_value = 0
+    cmd = ['git', 'show', '{0}:{1}'.format(commit, filename)]
+    p = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+    xml_string = p.stdout.read()
+    print("[+] validating XML file: {0}".format(filename))
+    try:
+        xml.sax.parseString(xml_string, xml.sax.ContentHandler())
+    except xml.sax.SAXException as e:
+        print('[-] validating {0} failed ({1})'.format(filename, e))
+        return_value = 1
+    except:
+        print('[-] could not open {0}'.format(filename))
+        return_value = 1
+    return return_value
+
+
+main()

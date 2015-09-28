@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+
+"""
+Validates files before they are commited to a git repository
+
+Copyright (C) 2015 Peter Mosmans [Go Forward]
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+"""
+
+
+import subprocess
+import sys
+import xml.sax
+
+# When set to True, the commit will be rejected when validation fails
+reject = True
+
+
+def main():
+    sys.exit(validate_files(staged_files()) and reject)
+
+
+def staged_files():
+    """Returns a list of all modified and added staged files."""
+    cmd = ['git', 'diff', '--staged', '--name-only', '--diff-filter', 'AM']
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+    return p.stdout.read().splitlines()
+
+
+def validate_files(filenames):
+    """Checks file extensions and calls appropriate validator function."""
+    return_value = 0
+    for filename in filenames:
+        if (filename.lower().endswith('.xml') or
+                filename.lower().endswith('xml"')):
+            return_value = validate_xml(filename) or return_value
+    return return_value
+
+
+def validate_xml(filename):
+    """Validates XML file by trying to parse it."""
+    return_value = 0
+    print("[+] validating XML file: {0}".format(filename))
+    try:
+        with open(filename, 'rb') as xml_file:
+            xml.sax.parse(xml_file, xml.sax.ContentHandler())
+    except xml.sax.SAXException as e:
+        print('[-] validating {0} failed ({1})'.format(filename, e))
+        return_value = 1
+    except:
+        print('[-] could not open {0}'.format(filename))
+        return_value = 1
+    return return_value
+
+
+main()
