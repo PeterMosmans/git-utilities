@@ -10,24 +10,26 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 """
 
-
+from __future__ import absolute_import
+from __future__ import print_function
 import subprocess
 import sys
 import xml.sax
 
 # When set to True, the commit will be rejected when validation fails
-reject = True
+REJECT = True
 
 
 def main():
-    sys.exit(validate_files(staged_files()) and reject)
+    """The main program."""
+    sys.exit(validate_files(staged_files()) and REJECT)
 
 
 def staged_files():
     """Returns a list of all modified and added staged files."""
     cmd = ['git', 'diff', '--staged', '--name-only', '--diff-filter', 'AM']
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-    return p.stdout.read().splitlines()
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+    return process.stdout.read().splitlines()
 
 
 def validate_files(filenames):
@@ -47,13 +49,14 @@ def validate_xml(filename):
     try:
         with open(filename, 'rb') as xml_file:
             xml.sax.parse(xml_file, xml.sax.ContentHandler())
-    except xml.sax.SAXException as e:
-        print('[-] validating {0} failed ({1})'.format(filename, e))
+    except xml.sax.SAXException as exception:
+        print('[-] validating {0} failed ({1})'.format(filename, exception))
         return_value = 1
-    except:
+    except IOError:
         print('[-] could not open {0}'.format(filename))
         return_value = 1
     return return_value
 
 
-main()
+if __name__ == "__main__":
+    main()
