@@ -20,11 +20,23 @@ import subprocess
 import sys
 import xml.sax
 
-import yaml
 
-
+# When set to True, the report will be validated using docbuilder
+DOCBUILDER = False
 # When set to True, the commit will be rejected when validation fails
 REJECT = True
+REPORT = 'Report/source/report.xml'
+# When set to True, validates YAML files
+YAML = False
+
+
+if DOCBUILDER:
+    import docbuilder_proxy
+    import proxy_vagrant
+
+
+if YAML:
+    import yaml
 
 
 def main():
@@ -55,7 +67,18 @@ def validate_files(filenames):
         if (filename.lower().endswith('.yaml') or
                 filename.lower().endswith('yml')):
             return_value = validate_yaml(filename) or return_value
+        if filename == REPORT:
+            return_value = validate_report(filename) or return_value
     return return_value
+
+
+def validate_report(filename):
+    """
+    Validates XML report file by trying to build it
+    """
+    host, command = docbuilder_proxy.read_config()
+    command = command + ' -c'
+    return proxy_vagrant.execute_command(host, command)
 
 
 def validate_xml(filename):
