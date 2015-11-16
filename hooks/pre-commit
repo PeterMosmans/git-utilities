@@ -16,6 +16,7 @@ the Free Software Foundation, either version 3 of the License, or
 from __future__ import absolute_import
 from __future__ import print_function
 
+import os
 import subprocess
 import sys
 import xml.sax
@@ -31,6 +32,7 @@ YAML = False
 
 
 if DOCBUILDER:
+    sys.path.append(os.path.dirname(__file__) + "../../")
     import docbuilder_proxy
     import proxy_vagrant
 
@@ -43,7 +45,21 @@ def main():
     """
     The main program.
     """
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '-a':
+            print('[+] validating all files')
+            sys.exit(validate_files(all_files()) and REJECT)
     sys.exit(validate_files(staged_files()) and REJECT)
+
+
+def all_files():
+    """
+    Returns a list of all files.
+    """
+    cmd = ['git', 'ls-files']
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    return process.stdout.read().splitlines()
 
 
 def staged_files():
@@ -68,11 +84,11 @@ def validate_files(filenames):
                 filename.lower().endswith('yml')):
             return_value = validate_yaml(filename) or return_value
         if filename == REPORT:
-            return_value = validate_report(filename) or return_value
+            return_value = validate_report() or return_value
     return return_value
 
 
-def validate_report(filename):
+def validate_report():
     """
     Validates XML report file by trying to build it
     """
