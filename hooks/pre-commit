@@ -32,7 +32,8 @@ YAML = False
 
 
 if DOCBUILDER:
-    sys.path.append(os.path.dirname(__file__) + "../../")
+    # Use the docbuilder scripts from the root of the repository
+    sys.path.append(os.path.dirname(__file__) + "./../../")
     import docbuilder_proxy
     import proxy_vagrant
 
