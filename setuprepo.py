@@ -24,7 +24,7 @@ import tempfile
 import textwrap
 
 
-VERSION = '0.1'
+VERSION = '0.2'
 CONFIG_FILE = 'setuprepo.yml'
 
 
@@ -208,17 +208,20 @@ def patch_repo(options):
         result = execute_command(['cp', options['patchfile'],
                                   temp_file], options['verbose'])
         if options['modify']:
-            print_status('Modifying patchfile, replacing TARGET with {0} and'
-                         ' REPO with {1}'.format(options['target'],
-                                                 options['repo']), options)
+            print_status('Modifying patchfile, replacing NAMESPACE with {0}, '
+                         'REMOTE with {1}, REPO with {2} and '
+                         'TARGET with {3}'.format(options['namespace'],
+                                                  options['remote'],
+                                                  options['repo'],
+                                                  options['target']), options)
             with open(temp_file, 'w') as modify:
                 with open(options['patchfile'], 'r') as patchfile:
-                    lines = patchfile.read().splitlines()
-                    for line in lines:
-                        modify.write(string.replace(string.
-                                                    replace(line, 'TARGET',
-                                                            options['target']),
-                                                    'REPO', options['repo']))
+                    for line in patchfile.read().splitlines():
+                        for keyword in ['namespace', 'remote', 'repo',
+                                        'target']:
+                            line = string.replace(line, keyword.upper(),
+                                                  options[keyword])
+                        modify.write(line)
         else:
             result = execute_command(['cp', options['patchfile'],
                                       temp_file], options['verbose'])
@@ -263,8 +266,7 @@ def main():
     Main program loop.
     """
     banner = 'setuprepo.py version ' + VERSION
-    options = parse_arguments(banner)
-    options = read_config(options)
+    options = read_config(parse_arguments(banner))
     preflight_checks(options)
     clone_repo(options)
     patch_repo(options)
