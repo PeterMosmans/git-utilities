@@ -104,14 +104,14 @@ the Free Software Foundation, either version 3 of the License, or
     parser.add_argument('--config', action='store', default=CONFIG_FILE,
                         help='Load config file (default {0})'.
                         format(CONFIG_FILE))
-    parser.add_argument('--modify', action='store_true', default=False,
-                        help='Modify patchfile before applying')
     parser.add_argument('-r', '--remote', type=str, action='store',
                         help="""remote repository address""")
     parser.add_argument('-n', '--namespace', type=str, action='store',
                         help="""namespace of the repository""")
     parser.add_argument('--no-clone', action='store_true',
                         help="""do not clone repository""")
+    parser.add_argument('--no-modify', action='store_true',
+                        help="""do not modify patch and/or template""")
     parser.add_argument('--no-patch', action='store_true',
                         help="""do not patch repository""")
     parser.add_argument('--no-template', action='store_true',
@@ -182,6 +182,8 @@ def clone_repo(options):
     """
     Clones a repo using parameters in @options.
     """
+    if options['no_clone']:
+        return
     print_status('Cloning {0}/{1}/{2} to {3}'.format(options['remote'],
                                                      options['namespace'],
                                                      options['repo'],
@@ -207,7 +209,7 @@ def patch_repo(options):
     """
     Patches repository.
     """
-    if not options['patchfile']:
+    if not options['patchfile'] or options['no_patch']:
         return
     print_status('Patching {0}/{1} with {2}'.format(options['target'],
                                                     options['repo'],
@@ -216,7 +218,7 @@ def patch_repo(options):
     try:
         temp_file = os.path.join(options['target'],
                                  next(tempfile._get_candidate_names()))  # pylint: disable=protected-access
-        if options['modify']:
+        if not options['no_modify']:
             print_status('Modifying patchfile, replacing NAMESPACE with {0}, '
                          'REMOTE with {1}, REPO with {2} and '
                          'TARGET with {3}'.format(options['namespace'],
@@ -263,7 +265,7 @@ def create_template(options):
                                   os.path.join(options['notes'],
                                                options['repo'] + '.txt')],
                                  options)
-        if options['modify']:
+        if not options['no_modify']:
             with open(os.path.join(options['notes'],
                                    options['repo'] + '.txt'), 'r') as template:
                 raw_data = template.read()
@@ -296,10 +298,8 @@ def main():
     banner = 'setuprepo.py version ' + VERSION
     options = read_config(parse_arguments(banner))
     preflight_checks(options)
-    if not options['no_clone']:
-        clone_repo(options)
-    if not options['no_patch']:
-        patch_repo(options)
+    clone_repo(options)
+    patch_repo(options)
     create_template(options)
     print_line('[+] Success: check {0}{1}'.format(options['target'],
                                                   options['repo']))
