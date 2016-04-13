@@ -24,11 +24,11 @@ import tempfile
 import textwrap
 
 
-VERSION = '0.2'
+VERSION = '0.3'
 CONFIG_FILE = 'setuprepo.yml'
 
 
-def execute_command(cmd, verbose=False):
+def execute_command(cmd, options):
     """
     Executes command @cmd
     Shows output when @quiet is False
@@ -45,9 +45,9 @@ def execute_command(cmd, verbose=False):
         result = -1
         print_error('could not execute {0}'.format(cmd))
         print_error(format(exception.strerror))
-    if (result != 0) and verbose:
+    if (result != 0) and options['verbose']:
         print_error(stderr)
-    print_status(stdout, verbose)
+    print_status(stdout, options)
     return result == 0
 
 
@@ -56,10 +56,11 @@ def print_line(text, error=False):
     Prints @text to stdout, or to stderr if @error is True.
     Flushes stdout and stdin.
     """
-    if not error:
-        print(text)
-    else:
-        print(text, file=sys.stderr)
+    if text:
+        if not error:
+            print(text)
+        else:
+            print(text, file=sys.stderr)
     sys.stdout.flush()
     sys.stderr.flush()
 
@@ -78,7 +79,7 @@ def print_status(text, options):
     """
     Prints status message @text if @options contains verbose.
     """
-    if options['verbose']:
+    if options['verbose'] and text:
         print_line('[*] ' + text)
 
 
@@ -109,6 +110,12 @@ the Free Software Foundation, either version 3 of the License, or
                         help="""remote repository address""")
     parser.add_argument('-n', '--namespace', type=str, action='store',
                         help="""namespace of the repository""")
+    parser.add_argument('--no-clone', action='store_true',
+                        help="""do not clone repository""")
+    parser.add_argument('--no-patch', action='store_true',
+                        help="""do not patch repository""")
+    parser.add_argument('--no-template', action='store_true',
+                        help="""do not create template""")
     parser.add_argument('--patchfile', type=str, action='store',
                         help="""patchfile for new repositories""")
     parser.add_argument('-t', '--target', type=str, action='store',
@@ -133,11 +140,14 @@ def preflight_checks(options):
     try:
         if not os.path.isdir(options['target']):
             print_error('Target directory does not exist', -1)
-        if os.path.isdir(os.path.join(options['target'], options['repo'])):
+        if not options['no_clone'] and \
+           os.path.isdir(os.path.join(options['target'], options['repo'])):
             print_error('Target repository already exists', -1)
-        if not os.path.exists(options['template']):
+        if not options['no_template'] and not \
+           os.path.exists(options['template']):
             print_error('Template file does not exist', -1)
-        if not os.path.exists(options['patchfile']):
+        if not options['no_patch'] and not \
+           os.path.exists(options['patchfile']):
             print_error('Patchfile does not exist', -1)
     except TypeError:
         print_error('Error verifying paths', -1)
@@ -182,7 +192,7 @@ def clone_repo(options):
         result = execute_command(['git', 'clone', '{0}/{1}/{2}'.
                                   format(options['remote'],
                                          options['namespace'],
-                                         options['repo'])], options['verbose'])
+                                         options['repo'])], options)
     except IOError:
         print('no can do')
         result = False
@@ -204,9 +214,8 @@ def patch_repo(options):
                                                     options['patchfile']),
                  options)
     try:
-        temp_file = next(tempfile._get_candidate_names())  # pylint: disable=protected-access
-        result = execute_command(['cp', options['patchfile'],
-                                  temp_file], options['verbose'])
+        temp_file = os.path.join(options['target'],
+                                 next(tempfile._get_candidate_names()))  # pylint: disable=protected-access
         if options['modify']:
             print_status('Modifying patchfile, replacing NAMESPACE with {0}, '
                          'REMOTE with {1}, REPO with {2} and '
@@ -214,7 +223,7 @@ def patch_repo(options):
                                                   options['remote'],
                                                   options['repo'],
                                                   options['target']), options)
-            with open(temp_file, 'w') as modify:
+            with open(temp_file, 'w+') as modify:
                 with open(options['patchfile'], 'r') as patchfile:
                     for line in patchfile.read().splitlines():
                         for keyword in ['namespace', 'remote', 'repo',
@@ -224,14 +233,16 @@ def patch_repo(options):
                         modify.write(line)
         else:
             result = execute_command(['cp', options['patchfile'],
-                                      temp_file], options['verbose'])
+                                      temp_file], options)
         os.chdir(os.path.join(options['target'], options['repo']))
         result = execute_command(['patch', '-Np1', '-i', temp_file],
-                                 options['verbose'])
+                                 options)
     except IOError:
         result = False
     finally:
-        os.remove(temp_file)
+        if os.path.isfile(temp_file):
+            os.remove(temp_file)
+        print(temp_file)
     if not result:
         print_error('Failed patching {0}/{1} with {2}'.
                     format(options['target'], options['repo'],
@@ -242,7 +253,7 @@ def create_template(options):
     """
     Creates templatefile.
     """
-    if not options['template']:
+    if not options['template'] or options['no_template']:
         return
     print_status('Creating template {0}/{1}.txt from {2}'.
                  format(options['notes'], options['repo'],
@@ -251,7 +262,24 @@ def create_template(options):
         result = execute_command(['cp', options['template'],
                                   os.path.join(options['notes'],
                                                options['repo'] + '.txt')],
-                                 options['verbose'])
+                                 options)
+        if options['modify']:
+            with open(os.path.join(options['notes'],
+                                   options['repo'] + '.txt'), 'r') as template:
+                raw_data = template.read()
+                print_status('Modifying templatefile, replacing NAMESPACE with'
+                             ' {0}, REMOTE with {1}, REPO with {2} and '
+                             'TARGET with {3}'.format(options['namespace'],
+                                                      options['remote'],
+                                                      options['repo'],
+                                                      options['target']),
+                             options)
+                for keyword in ['namespace', 'remote', 'repo', 'target']:
+                    raw_data = raw_data.replace(keyword.upper(),
+                                                options[keyword])
+        with open(os.path.join(options['notes'],
+                               options['repo'] + '.txt'), 'w') as template:
+            template.write(raw_data)
     except IOError:
         print('no can do')
         result = False
@@ -268,11 +296,13 @@ def main():
     banner = 'setuprepo.py version ' + VERSION
     options = read_config(parse_arguments(banner))
     preflight_checks(options)
-    clone_repo(options)
-    patch_repo(options)
+    if not options['no_clone']:
+        clone_repo(options)
+    if not options['no_patch']:
+        patch_repo(options)
     create_template(options)
-    print_line('Success: check {0}/{1}'.format(options['target'],
-                                               options['repo']))
+    print_line('[+] Success: check {0}{1}'.format(options['target'],
+                                                  options['repo']))
 
 
 if __name__ == "__main__":
