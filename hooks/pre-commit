@@ -104,14 +104,15 @@ def validate_xml(filename):
     """
     return_value = 0
     print("[+] validating XML file: {0}".format(filename))
+
     try:
         with open(filename, 'rb') as xml_file:
             xml.sax.parse(xml_file, xml.sax.ContentHandler())
     except xml.sax.SAXException as exception:
         print('[-] validating {0} failed ({1})'.format(filename, exception))
         return_value = 1
-    except IOError:
-        print('[-] could not open {0}'.format(filename))
+    except IOError as exception:
+        print('[-] could not parse {0} ({1})'.format(filename, exception))
         return_value = 1
     return return_value
 
