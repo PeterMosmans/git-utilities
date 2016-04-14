@@ -17,15 +17,66 @@ from __future__ import print_function
 import argparse
 import os
 import re
-import string
 import sys
 import subprocess
 import tempfile
 import textwrap
 
 
-VERSION = '0.3'
+VERSION = '0.4'
 CONFIG_FILE = 'setuprepo.yml'
+
+
+def clone_repo(options):
+    """
+    Clones a repo using parameters in @options.
+    """
+    if options['no_clone']:
+        return
+    print_status('Cloning {0}/{1}/{2} to {3}'.format(options['remote'],
+                                                     options['namespace'],
+                                                     options['repo'],
+                                                     options['target']),
+                 options)
+    try:
+        os.chdir(options['target'])
+        result = execute_command(['git', 'clone', '{0}/{1}/{2}'.
+                                  format(options['remote'],
+                                         options['namespace'],
+                                         options['repo'])], options)
+    except IOError:
+        print('no can do')
+        result = False
+    if not result:
+        print_error('Failed cloning {0}/{1}/{2} to {3}'.
+                    format(options['remote'], options['namespace'],
+                           options['repo'], options['target']), -1)
+    return result
+
+
+def create_template(options):
+    """
+    Creates templatefile.
+    """
+    if not options['template'] or options['no_template']:
+        return
+    print_status('Creating template {0}/{1}.txt from {2}'.
+                 format(options['notes'], options['repo'],
+                        options['template']), options)
+    try:
+        result = execute_command(['cp', options['template'],
+                                  os.path.join(options['notes'],
+                                               options['repo'] + '.txt')],
+                                 options)
+        modify_file(os.path.join(options['notes'], options['repo'] + '.txt'),
+                    options, 'template')
+    except IOError:
+        print('no can do')
+        result = False
+    if not result:
+        print_error('Failed creating template {0}/{1}.txt from {2}'.
+                    format(options['notes'], options['repo'],
+                           options['template']), -1)
 
 
 def execute_command(cmd, options):
@@ -51,36 +102,33 @@ def execute_command(cmd, options):
     return result == 0
 
 
-def print_line(text, error=False):
+def modify_file(filename, options, filetype):
     """
-    Prints @text to stdout, or to stderr if @error is True.
-    Flushes stdout and stdin.
+    Modifies @filename inline with parameters in @options.
+    @filetype is used to show which file is modified.
     """
-    if text:
-        if not error:
-            print(text)
-        else:
-            print(text, file=sys.stderr)
-    sys.stdout.flush()
-    sys.stderr.flush()
+    with open(filename, 'r') as inputfile:
+        modified = modify_text(inputfile.read(), options, filetype)
+
+    with open(filename, 'w') as outputfile:
+        outputfile.write(modified)
 
 
-def print_error(text, result=False):
+def modify_text(textfile, options, filetype):
     """
-    Prints error message @text and exits with result code @result if not 0.
-    """
-    if len(text):
-        print_line('[-] ' + text, True)
-    if result:
-        sys.exit(result)
+    Modifies @textfile with parameters in @options.
+    @filetype is used to show which file is modified.
 
-
-def print_status(text, options):
+    Returns modified @textfile.
     """
-    Prints status message @text if @options contains verbose.
-    """
-    if options['verbose'] and text:
-        print_line('[*] ' + text)
+    if not options['no_modify']:
+        print_status('Modifying {0}, replacing NAMESPACE with {1}, REMOTE with'
+                     ' {2}, REPO with {3} and TARGET with {4}'.
+                     format(filetype, options['namespace'], options['remote'],
+                            options['repo'], options['target']), options)
+        for keyword in ['namespace', 'remote', 'repo', 'target']:
+            textfile = textfile.replace(keyword.upper(), options[keyword])
+    return textfile
 
 
 def parse_arguments(banner):
@@ -130,6 +178,34 @@ the Free Software Foundation, either version 3 of the License, or
     return options
 
 
+def patch_repo(options):
+    """
+    Patches repository.
+    """
+    if not options['patchfile'] or options['no_patch']:
+        return
+    print_status('Patching {0}/{1} with {2}'.format(options['target'],
+                                                    options['repo'],
+                                                    options['patchfile']),
+                 options)
+    try:
+        temp_file = os.path.join(options['target'],
+                                 next(tempfile._get_candidate_names()))  # pylint: disable=protected-access
+        execute_command(['cp', options['patchfile'], tempfile], options)
+        modify_file(tempfile, options, 'patchfile')
+        os.chdir(os.path.join(options['target'], options['repo']))
+        result = execute_command(['patch', '-Np1', '-i', temp_file], options)
+    except IOError:
+        result = False
+    finally:
+        if os.path.isfile(temp_file):
+            os.remove(temp_file)
+    if not result:
+        print_error('Failed patching {0}/{1} with {2}'.
+                    format(options['target'], options['repo'],
+                           options['patchfile']), options)
+
+
 def preflight_checks(options):
     """
     Performs checks whether @options contain valid options.
@@ -151,6 +227,38 @@ def preflight_checks(options):
             print_error('Patchfile does not exist', -1)
     except TypeError:
         print_error('Error verifying paths', -1)
+
+
+def print_error(text, result=False):
+    """
+    Prints error message @text and exits with result code @result if not 0.
+    """
+    if len(text):
+        print_line('[-] ' + text, True)
+    if result:
+        sys.exit(result)
+
+
+def print_line(text, error=False):
+    """
+    Prints @text to stdout, or to stderr if @error is True.
+    Flushes stdout and stdin.
+    """
+    if text:
+        if not error:
+            print(text)
+        else:
+            print(text, file=sys.stderr)
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+
+def print_status(text, options):
+    """
+    Prints status message @text if @options contains verbose.
+    """
+    if options['verbose'] and text:
+        print_line('[*] ' + text)
 
 
 def read_config(options):
@@ -176,119 +284,6 @@ def read_config(options):
     except IndexError as exception:
         print_error('Missing variables in {0}'.format(filename), -1)
     return options
-
-
-def clone_repo(options):
-    """
-    Clones a repo using parameters in @options.
-    """
-    if options['no_clone']:
-        return
-    print_status('Cloning {0}/{1}/{2} to {3}'.format(options['remote'],
-                                                     options['namespace'],
-                                                     options['repo'],
-                                                     options['target']),
-                 options)
-    try:
-        os.chdir(options['target'])
-        result = execute_command(['git', 'clone', '{0}/{1}/{2}'.
-                                  format(options['remote'],
-                                         options['namespace'],
-                                         options['repo'])], options)
-    except IOError:
-        print('no can do')
-        result = False
-    if not result:
-        print_error('Failed cloning {0}/{1}/{2} to {3}'.
-                    format(options['remote'], options['namespace'],
-                           options['repo'], options['target']), -1)
-    return result
-
-
-def patch_repo(options):
-    """
-    Patches repository.
-    """
-    if not options['patchfile'] or options['no_patch']:
-        return
-    print_status('Patching {0}/{1} with {2}'.format(options['target'],
-                                                    options['repo'],
-                                                    options['patchfile']),
-                 options)
-    try:
-        temp_file = os.path.join(options['target'],
-                                 next(tempfile._get_candidate_names()))  # pylint: disable=protected-access
-        if not options['no_modify']:
-            print_status('Modifying patchfile, replacing NAMESPACE with {0}, '
-                         'REMOTE with {1}, REPO with {2} and '
-                         'TARGET with {3}'.format(options['namespace'],
-                                                  options['remote'],
-                                                  options['repo'],
-                                                  options['target']), options)
-            with open(temp_file, 'w+') as modify:
-                with open(options['patchfile'], 'r') as patchfile:
-                    for line in patchfile.read().splitlines():
-                        for keyword in ['namespace', 'remote', 'repo',
-                                        'target']:
-                            line = string.replace(line, keyword.upper(),
-                                                  options[keyword])
-                        modify.write(line)
-        else:
-            result = execute_command(['cp', options['patchfile'],
-                                      temp_file], options)
-        os.chdir(os.path.join(options['target'], options['repo']))
-        result = execute_command(['patch', '-Np1', '-i', temp_file],
-                                 options)
-    except IOError:
-        result = False
-    finally:
-        if os.path.isfile(temp_file):
-            os.remove(temp_file)
-        print(temp_file)
-    if not result:
-        print_error('Failed patching {0}/{1} with {2}'.
-                    format(options['target'], options['repo'],
-                           options['patchfile']), options)
-
-
-def create_template(options):
-    """
-    Creates templatefile.
-    """
-    if not options['template'] or options['no_template']:
-        return
-    print_status('Creating template {0}/{1}.txt from {2}'.
-                 format(options['notes'], options['repo'],
-                        options['template']), options)
-    try:
-        result = execute_command(['cp', options['template'],
-                                  os.path.join(options['notes'],
-                                               options['repo'] + '.txt')],
-                                 options)
-        if not options['no_modify']:
-            with open(os.path.join(options['notes'],
-                                   options['repo'] + '.txt'), 'r') as template:
-                raw_data = template.read()
-                print_status('Modifying templatefile, replacing NAMESPACE with'
-                             ' {0}, REMOTE with {1}, REPO with {2} and '
-                             'TARGET with {3}'.format(options['namespace'],
-                                                      options['remote'],
-                                                      options['repo'],
-                                                      options['target']),
-                             options)
-                for keyword in ['namespace', 'remote', 'repo', 'target']:
-                    raw_data = raw_data.replace(keyword.upper(),
-                                                options[keyword])
-        with open(os.path.join(options['notes'],
-                               options['repo'] + '.txt'), 'w') as template:
-            template.write(raw_data)
-    except IOError:
-        print('no can do')
-        result = False
-    if not result:
-        print_error('Failed creating template {0}/{1}.txt from {2}'.
-                    format(options['notes'], options['repo'],
-                           options['template']), -1)
 
 
 def main():
