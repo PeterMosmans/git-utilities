@@ -24,7 +24,6 @@ import textwrap
 
 
 VERSION = '0.4'
-CONFIG_FILE = 'setuprepo.yml'
 
 
 def clone_repo(options):
@@ -149,9 +148,8 @@ it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.'''))
     parser.add_argument('repo', type=str, help="""repository name""")
-    parser.add_argument('--config', action='store', default=CONFIG_FILE,
-                        help='Load config file (default {0})'.
-                        format(CONFIG_FILE))
+    parser.add_argument('--config', action='store',
+                        help='load config file')
     parser.add_argument('-r', '--remote', type=str, action='store',
                         help="""remote repository address""")
     parser.add_argument('-n', '--namespace', type=str, action='store',
@@ -210,15 +208,23 @@ def preflight_checks(options):
     """
     Performs checks whether @options contain valid options.
     """
-    for key in ['remote', 'target', 'namespace']:
-        if key not in options or not options[key]:
-            print_error('Missing parameter: {0}'.format(key), -1)
+    if not options['target']:
+        options['target'] = os.getcwd()
+    if not options['template']:
+        options['no_template'] = True
+    if not options['patchfile']:
+        options['no_patch'] = True
+    if not options['no_clone']:
+        for key in ['remote', 'target', 'namespace']:
+            if key not in options or not options[key]:
+                print_error('Missing parameter: {0}'.format(key), -1)
     try:
         if not os.path.isdir(options['target']):
             print_error('Target directory does not exist', -1)
         if not options['no_clone'] and \
            os.path.isdir(os.path.join(options['target'], options['repo'])):
-            print_error('Target repository already exists', -1)
+            print_error('Target directory already exists, not cloning')
+            options['no_clone'] = True
         if not options['no_template'] and not \
            os.path.exists(options['template']):
             print_error('Template file does not exist', -1)
@@ -269,6 +275,8 @@ def read_config(options):
     Returns: an array of options.
     """
     filename = options['config']
+    if not filename:
+        return options
     try:
         with open(filename, 'r') as config_file:
             contents = config_file.read()
@@ -296,8 +304,8 @@ def main():
     clone_repo(options)
     patch_repo(options)
     create_template(options)
-    print_line('[+] Success: check {0}{1}'.format(options['target'],
-                                                  options['repo']))
+    print_line('[+] Success: check {0}'.format(os.path.join(options['target'],
+                                                            options['repo'])))
 
 
 if __name__ == "__main__":
