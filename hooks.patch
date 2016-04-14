@@ -1,0 +1,142 @@
+diff -Nur original/.git/hooks/pre-commit modified/.git/hooks/pre-commit
+--- original/.git/hooks/pre-commit	1970-01-01 00:00:00.000000000 +0000
++++ modified/.git/hooks/pre-commit	2016-04-14 05:09:03.649728400 +0000
+@@ -0,0 +1,137 @@
++#!/usr/bin/env python
++# pylint: disable=invalid-name
++
++"""
++Validates files before they are commited to a git repository
++
++Copyright (C) 2015 Peter Mosmans [Go Forward]
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++"""
++
++
++from __future__ import absolute_import
++from __future__ import print_function
++
++import os
++import subprocess
++import sys
++import xml.sax
++
++
++# When set to True, the report will be validated using docbuilder
++DOCBUILDER = False
++# When set to True, the commit will be rejected when validation fails
++REJECT = True
++REPORT = 'Report/source/report.xml'
++# When set to True, validates YAML files
++YAML = False
++
++
++if DOCBUILDER:
++    # Use the docbuilder scripts from the root of the repository
++    sys.path.append(os.path.dirname(__file__) + "./../../")
++    import docbuilder_proxy
++    import proxy_vagrant
++
++
++if YAML:
++    import yaml
++
++
++def main():
++    """
++    The main program.
++    """
++    if len(sys.argv) > 1:
++        if sys.argv[1] == '-a':
++            print('[+] validating all files')
++            sys.exit(validate_files(all_files()) and REJECT)
++    sys.exit(validate_files(staged_files()) and REJECT)
++
++
++def all_files():
++    """
++    Returns a list of all files.
++    """
++    cmd = ['git', 'ls-files']
++    process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
++                               stderr=subprocess.PIPE)
++    return process.stdout.read().splitlines()
++
++
++def staged_files():
++    """
++    Returns a list of all modified and added staged files.
++    """
++    cmd = ['git', 'diff', '--staged', '--name-only', '--diff-filter', 'AM']
++    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
++    return process.stdout.read().splitlines()
++
++
++def validate_files(filenames):
++    """
++    Checks file extensions and calls appropriate validator function.
++    """
++    return_value = 0
++    for filename in filenames:
++        if (filename.lower().endswith('.xml') or
++                filename.lower().endswith('xml"')):
++            return_value = validate_xml(filename) or return_value
++        if (filename.lower().endswith('.yaml') or
++                filename.lower().endswith('yml')):
++            return_value = validate_yaml(filename) or return_value
++        if filename == REPORT:
++            return_value = validate_report() or return_value
++    return return_value
++
++
++def validate_report():
++    """
++    Validates XML report file by trying to build it
++    """
++    host, command = docbuilder_proxy.read_config()
++    command = command + ' -c'
++    return proxy_vagrant.execute_command(host, command)
++
++
++def validate_xml(filename):
++    """
++    Validates XML file by trying to parse it.
++    """
++    return_value = 0
++    print("[+] validating XML file: {0}".format(filename))
++    try:
++        with open(filename, 'rb') as xml_file:
++            xml.sax.parse(xml_file, xml.sax.ContentHandler())
++    except xml.sax.SAXException as exception:
++        print('[-] validating {0} failed ({1})'.format(filename, exception))
++        return_value = 1
++    except IOError:
++        print('[-] could not open {0}'.format(filename))
++        return_value = 1
++    return return_value
++
++
++def validate_yaml(filename):
++    """
++    Validates YAML file by trying to load it.
++    """
++    return_value = 0
++    print("[+] validating YAML file: {0}".format(filename))
++    try:
++        yaml.load(open(filename), Loader=yaml.Loader)
++    except yaml.YAMLError as exception:
++        print('[-] validating {0} failed ({1})'.format(filename, exception))
++        return_value = 1
++    except IOError:
++        print('[-] could not open {0}'.format(filename))
++        return_value = 1
++    return return_value
++
++
++if __name__ == "__main__":
++    main()
+Binary files original/.git/index and modified/.git/index differ
