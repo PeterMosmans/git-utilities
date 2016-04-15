@@ -4,7 +4,7 @@
 """
 Validates files before they are commited to a git repository
 
-Copyright (C) 2015 Peter Mosmans [Go Forward]
+Copyright (C) 2015-2016 Peter Mosmans [Go Forward]
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -16,41 +16,14 @@ the Free Software Foundation, either version 3 of the License, or
 from __future__ import absolute_import
 from __future__ import print_function
 
-import os
+import re
 import subprocess
 import sys
 import xml.sax
 
 
-# When set to True, the report will be validated using docbuilder
-DOCBUILDER = False
-# When set to True, the commit will be rejected when validation fails
-REJECT = True
-REPORT = 'Report/source/report.xml'
-# When set to True, validates YAML files
-YAML = False
-
-
-if DOCBUILDER:
-    # Use the docbuilder scripts from the root of the repository
-    sys.path.append(os.path.dirname(__file__) + "./../../")
-    import docbuilder_proxy
-    import proxy_vagrant
-
-
-if YAML:
-    import yaml
-
-
-def main():
-    """
-    The main program.
-    """
-    if len(sys.argv) > 1:
-        if sys.argv[1] == '-a':
-            print('[+] validating all files')
-            sys.exit(validate_files(all_files()) and REJECT)
-    sys.exit(validate_files(staged_files()) and REJECT)
+CONFIG_FILE = '.git/hooks/pre-commit.yml'
+VERSION = '0.2'
 
 
 def all_files():
@@ -59,8 +32,126 @@ def all_files():
     """
     cmd = ['git', 'ls-files']
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
+                               stderr=False)
     return process.stdout.read().splitlines()
+
+
+def execute_command(cmd, verbose=False):
+    """
+    Executes command @cmd
+    Shows output when @verbose is True
+
+    Returns: False if command failed
+    """
+    stderr = ''
+    try:
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+        result = process.returncode
+    except OSError as exception:
+        result = -1
+        print_error('could not execute {0}'.format(cmd))
+        print_error(format(exception.strerror))
+    if (result != 0) and verbose:
+        print_error(stderr)
+    print_status(stdout, verbose)
+    return result == 0
+
+
+def is_python(filename):
+    """
+    Returns: True if @filename is a Python script
+    """
+    result = False
+    try:
+        with open(filename, 'r') as python_file:
+            first_line = python_file.readline()
+        result = '#!' in first_line and 'python' in first_line
+    except IOError:
+        pass
+    return result
+
+
+def main():
+    """
+    The main program.
+    """
+    options = {'config': CONFIG_FILE}
+    options = read_config(options)
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '-a':
+            print('[+] validating all files')
+            sys.exit(validate_files(all_files(), options) and options['reject'])
+    sys.exit(validate_files(staged_files(), options) and options['reject'])
+
+
+def print_error(text, result=False):
+    """
+    Prints error message @text and exits with result code @result if not 0.
+    """
+    if len(text):
+        print_line('[-] ' + text, True)
+    if result:
+        sys.exit(result)
+
+
+def print_line(text, error=False):
+    """
+    Prints @text to stdout, or to stderr if @error is True.
+    Flushes stdout and stdin.
+    """
+    if text:
+        if not error:
+            print(text)
+        else:
+            print(text, file=sys.stderr)
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+
+def print_status(text, verbose=False):
+    """
+    Prints status message @text if @verbose is True
+    """
+    if verbose and text:
+        print_line('[*] ' + text)
+
+
+def read_config(options):
+    """
+    Reads parameters from @options['config'],  but doesn't overwrite non-empty
+    @options parameters.
+
+    Returns: an array of options.
+    """
+    contents = False
+    try:
+        with open(options['config'], 'r') as config_file:
+            contents = config_file.read()
+    except IOError as exception:
+        print_error('Could not open configuration file {0}: {1}'.
+                    format(options['config'], exception.strerror))
+    for key in ['docbuilder', 'python', 'reject', 'treshold', 'verbose',
+                'yaml']:
+        if key not in options:
+            if contents and re.findall(r'{0}:\s?(.*)'.format(key), contents):
+                options[key] = re.findall(r'{0}:\s?(.*)'.format(key),
+                                          contents)[0]
+            else:
+                options[key] = False
+    try:
+        options['treshold'] = float(options['treshold'])
+    except ValueError:
+        options['treshold'] = 0
+        print_error('treshold should be a float, disabling')
+    if options['yaml']:
+        try:
+            import yaml
+        except ImportError:
+            print_error('could not import yaml, disabling validation')
+            options['yaml'] = False
+    return options
 
 
 def staged_files():
@@ -72,39 +163,64 @@ def staged_files():
     return process.stdout.read().splitlines()
 
 
-def validate_files(filenames):
+def validate_files(filenames, options):
     """
     Checks file extensions and calls appropriate validator function.
     """
     return_value = 0
     for filename in filenames:
+        if options['python']:
+            if filename.lower().endswith('.py') or is_python(filename):
+                return_value = validate_python(filename, options) or \
+                               return_value
         if (filename.lower().endswith('.xml') or
                 filename.lower().endswith('xml"')):
-            return_value = validate_xml(filename) or return_value
+            return_value = validate_xml(filename, options) or return_value
         if (filename.lower().endswith('.yaml') or
                 filename.lower().endswith('yml')):
-            return_value = validate_yaml(filename) or return_value
-        if filename == REPORT:
-            return_value = validate_report() or return_value
+            return_value = validate_yaml(filename, options) or return_value
     return return_value
 
 
-def validate_report():
+def validate_python(filename, options):
     """
-    Validates XML report file by trying to build it
+    Validates Python file by running pylint on it.
+
+    Returns 0 if validated succsesfully.
     """
-    host, command = docbuilder_proxy.read_config()
-    command = command + ' -c'
-    return proxy_vagrant.execute_command(host, command)
+    if not options['python'] and not options['treshold']:
+        return 0
+    print("[+] validating Python file using pylint: {0}".format(filename))
+    try:
+        result = execute_command(['pylint', '-E', filename], options['verbose'])
+        if options['treshold']:
+            process = subprocess.Popen(['pylint', filename],
+                                       stdout=subprocess.PIPE, stderr=False)
+            stdout = process.communicate()
+            results = float(re.findall(r"Your code has been rated at ([\d\.]+)/10",
+                                       str(stdout))[0])
+            print_status('{0} has been rated {1}'.format(filename, results),
+                         options['verbose'])
+            if results < float(options['treshold']):
+                print_line('[-] score of {0} ({1}) is below treshold of {2}'.
+                           format(filename, results, options['treshold']))
+                result = True
+            else:
+                result = False
+    except IOError as exception:
+        print('[-] could not parse {0} ({1})'.format(filename, exception))
+        result = True
+    return result
 
 
-def validate_xml(filename):
+def validate_xml(filename, options):
     """
     Validates XML file by trying to parse it.
     """
     return_value = 0
+    if not options['xml']:
+        return return_value
     print("[+] validating XML file: {0}".format(filename))
-
     try:
         with open(filename, 'rb') as xml_file:
             xml.sax.parse(xml_file, xml.sax.ContentHandler())
@@ -117,11 +233,14 @@ def validate_xml(filename):
     return return_value
 
 
-def validate_yaml(filename):
+def validate_yaml(filename, options):
     """
     Validates YAML file by trying to load it.
     """
     return_value = 0
+    if not options['yaml']:
+        return return_value
+    import yaml
     print("[+] validating YAML file: {0}".format(filename))
     try:
         yaml.load(open(filename), Loader=yaml.Loader)
