@@ -81,7 +81,7 @@ def create_template(options):
 def execute_command(cmd, options):
     """
     Executes command @cmd
-    Shows output when @quiet is False
+    Shows output when @options['verbose'] is True
 
     Returns: False if command failed
     """
@@ -285,11 +285,11 @@ def print_line(text, error=False):
     sys.stderr.flush()
 
 
-def print_status(text, options):
+def print_status(text, verbose=False):
     """
-    Prints status message @text if @options contains verbose.
+    Prints status message @text if @verbose is True
     """
-    if options['verbose'] and text:
+    if verbose and text:
         print_line('[*] ' + text)
 
 
