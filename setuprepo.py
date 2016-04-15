@@ -23,7 +23,7 @@ import tempfile
 import textwrap
 
 
-VERSION = '0.4'
+VERSION = '0.5'
 
 
 def clone_repo(options):
@@ -164,6 +164,9 @@ the Free Software Foundation, either version 3 of the License, or
                         help="""do not create template""")
     parser.add_argument('--patchfile', type=str, action='store',
                         help="""patchfile for new repositories""")
+    parser.add_argument('--prepare', action='store_true',
+                        help="""clone the repo, create an original and
+                        modified folder, and exit""")
     parser.add_argument('-t', '--target', type=str, action='store',
                         help="""local target for the repository structure""")
     parser.add_argument('--notes', type=str, action='store',
@@ -235,6 +238,29 @@ def preflight_checks(options):
         print_error('Error verifying paths', -1)
 
 
+def prepare_patch(options):
+    """
+    Copy the cloned repository to an original and modified folder.
+    """
+    if options['prepare']:
+        repo = os.path.join(options['target'], options['repo'])
+        original = os.path.join(options['target'], 'original')
+        modified = os.path.join(options['target'], 'modified')
+        result = execute_command(['cp', '-r', repo, original], options) and \
+            execute_command(['cp', '-r', repo, modified], options)
+        if result:
+            print_line('[+] Success: check {0} and {1}'.format(original,
+                                                               modified))
+            print_line("""[*] Hint for creating patchfiles:
+            LC_ALL=C TZ=UTC diff -Nur original/ modified/ > patch.file""")
+            sys.exit(0)
+        else:
+            print_error('Failed copying {0} to {1} and {2}'.format(repo,
+                                                                   original,
+                                                                   modified),
+                        True)
+
+
 def print_error(text, result=False):
     """
     Prints error message @text and exits with result code @result if not 0.
@@ -302,6 +328,7 @@ def main():
     options = read_config(parse_arguments(banner))
     preflight_checks(options)
     clone_repo(options)
+    prepare_patch(options)
     patch_repo(options)
     create_template(options)
     print_line('[+] Success: check {0}'.format(os.path.join(options['target'],
