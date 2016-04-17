@@ -23,7 +23,7 @@ import tempfile
 import textwrap
 
 
-VERSION = '0.5'
+VERSION = '0.6'
 
 
 def clone_repo(options):
@@ -31,6 +31,9 @@ def clone_repo(options):
     Clones a repo using parameters in @options.
     """
     if options['no_clone']:
+        return
+    if os.path.isdir(os.path.join(options['target'], options['repo'])):
+        print_error('Target directory already exists, not cloning')
         return
     print_status('Cloning {0}/{1}/{2} to {3}'.format(options['remote'],
                                                      options['namespace'],
@@ -59,16 +62,17 @@ def create_template(options):
     """
     if not options['template'] or options['no_template']:
         return
+    notes = os.path.join(options['notes'], options['repo'] + '.txt')
+    if os.path.isfile(notes):
+        print_error('Target notes file already exists, skipping template')
+        return
     print_status('Creating template {0}/{1}.txt from {2}'.
                  format(options['notes'], options['repo'],
                         options['template']), options)
     try:
-        result = execute_command(['cp', options['template'],
-                                  os.path.join(options['notes'],
-                                               options['repo'] + '.txt')],
-                                 options)
-        modify_file(os.path.join(options['notes'], options['repo'] + '.txt'),
-                    options, 'template')
+        result = execute_command(['cp', options['template'], notes], options)
+        modify_file(notes, options, 'template')
+        print_status('Created template file {0}'.format(notes))
     except IOError:
         print('no can do')
         result = False
@@ -213,7 +217,7 @@ def preflight_checks(options):
     """
     if not options['target']:
         options['target'] = os.getcwd()
-    if not options['template']:
+    if not options['template'] or not options['notes']:
         options['no_template'] = True
     if not options['patchfile']:
         options['no_patch'] = True
@@ -224,10 +228,6 @@ def preflight_checks(options):
     try:
         if not os.path.isdir(options['target']):
             print_error('Target directory does not exist', -1)
-        if not options['no_clone'] and \
-           os.path.isdir(os.path.join(options['target'], options['repo'])):
-            print_error('Target directory already exists, not cloning')
-            options['no_clone'] = True
         if not options['no_template'] and not \
            os.path.exists(options['template']):
             print_error('Template file does not exist', -1)
@@ -331,8 +331,6 @@ def main():
     prepare_patch(options)
     patch_repo(options)
     create_template(options)
-    print_line('[+] Success: check {0}'.format(os.path.join(options['target'],
-                                                            options['repo'])))
 
 
 if __name__ == "__main__":
