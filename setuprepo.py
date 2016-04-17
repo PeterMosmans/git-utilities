@@ -194,17 +194,17 @@ def patch_repo(options):
                                                     options['patchfile']),
                  options)
     try:
-        temp_file = os.path.join(options['target'],
+        patchfile = os.path.join(options['target'],
                                  next(tempfile._get_candidate_names()))  # pylint: disable=protected-access
-        execute_command(['cp', options['patchfile'], tempfile], options)
-        modify_file(tempfile, options, 'patchfile')
+        execute_command(['cp', options['patchfile'], patchfile], options)
+        modify_file(patchfile, options, 'patchfile')
         os.chdir(os.path.join(options['target'], options['repo']))
-        result = execute_command(['patch', '-Np1', '-i', temp_file], options)
+        result = execute_command(['patch', '-Np1', '-i', patchfile], options)
     except IOError:
         result = False
     finally:
-        if os.path.isfile(temp_file):
-            os.remove(temp_file)
+        if os.path.isfile(patchfile):
+            os.remove(patchfile)
     if not result:
         print_error('Failed patching {0}/{1} with {2}'.
                     format(options['target'], options['repo'],
