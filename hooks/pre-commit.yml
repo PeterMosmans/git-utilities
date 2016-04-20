@@ -1,0 +1,6 @@
+python: True
+reject: True
+treshold: 10
+verbose: True
+xml: True
+yaml: True

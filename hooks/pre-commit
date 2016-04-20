@@ -23,7 +23,7 @@ import xml.sax
 
 
 CONFIG_FILE = '.git/hooks/pre-commit.yml'
-VERSION = '0.2'
+VERSION = '0.3'
 
 
 def all_files():
@@ -132,7 +132,7 @@ def read_config(options):
     except IOError as exception:
         print_error('Could not open configuration file {0}: {1}'.
                     format(options['config'], exception.strerror))
-    for key in ['docbuilder', 'python', 'reject', 'treshold', 'verbose',
+    for key in ['docbuilder', 'python', 'reject', 'treshold', 'verbose', 'xml',
                 'yaml']:
         if key not in options:
             if contents and re.findall(r'{0}:\s?(.*)'.format(key), contents):
