@@ -66,13 +66,13 @@ def create_template(options):
     if os.path.isfile(notes):
         print_error('Target notes file already exists, skipping template')
         return
-    print_status('Creating template {0}/{1}.txt from {2}'.
+    print_status('Creating notes file {0}/{1}.txt from {2}'.
                  format(options['notes'], options['repo'],
                         options['template']), options)
     try:
         result = execute_command(['cp', options['template'], notes], options)
         modify_file(notes, options, 'template')
-        print_status('Created template file {0}'.format(notes))
+        print_status('Created notes file file {0}'.format(notes))
     except IOError:
         print('no can do')
         result = False
@@ -112,7 +112,6 @@ def modify_file(filename, options, filetype):
     """
     with open(filename, 'r') as inputfile:
         modified = modify_text(inputfile.read(), options, filetype)
-
     with open(filename, 'w') as outputfile:
         outputfile.write(modified)
 
