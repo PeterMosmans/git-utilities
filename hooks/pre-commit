@@ -197,17 +197,20 @@ def validate_python(filename, options):
             process = subprocess.Popen(['pylint', filename],
                                        stdout=subprocess.PIPE, stderr=False)
             stdout = process.communicate()
-            results = float(re.findall(r"Your code has been rated at ([\d\.]+)/10",
-                                       str(stdout))[0])
-            print_status('{0} has been rated {1}'.format(filename, results),
-                         options['verbose'])
+            if stdout:
+                results = float(re.findall(r"Your code has been rated at (-?[\d\.]+)/10",
+                                           str(stdout))[0])
+            else:
+                results = 0.0
+                print_status('{0} has been rated {1}'.format(filename, results),
+                             options['verbose'])
             if results < float(options['treshold']):
                 print_line('[-] score of {0} ({1}) is below treshold of {2}'.
                            format(filename, results, options['treshold']))
                 result = True
             else:
                 result = False
-    except IOError as exception:
+    except [IOError, IndexError] as exception:
         print('[-] could not parse {0} ({1})'.format(filename, exception))
         result = True
     return result
