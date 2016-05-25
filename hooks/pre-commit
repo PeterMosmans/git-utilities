@@ -23,7 +23,7 @@ import xml.sax
 
 
 CONFIG_FILE = '.git/hooks/pre-commit.yml'
-VERSION = '0.3'
+VERSION = '0.4'
 
 
 def all_files():
@@ -200,10 +200,10 @@ def validate_python(filename, options):
             if stdout:
                 results = float(re.findall(r"Your code has been rated at (-?[\d\.]+)/10",
                                            str(stdout))[0])
-            else:
-                results = 0.0
                 print_status('{0} has been rated {1}'.format(filename, results),
                              options['verbose'])
+            else:
+                results = 0.0
             if results < float(options['treshold']):
                 print_line('[-] score of {0} ({1}) is below treshold of {2}'.
                            format(filename, results, options['treshold']))
