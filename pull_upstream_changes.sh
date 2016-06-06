@@ -20,7 +20,7 @@ SOURCEROOT=""
 
 
 ## Don't change anything below this line
-VERSION=0.3
+VERSION=0.4
 
 source=$(dirname $(readlink -f $0))
 target=$1
@@ -48,9 +48,9 @@ pushd "$source" >/dev/null && git pull && popd >/dev/null
 echo "[*] Applying changes (if any)..."
 for sourcefile in ${SOURCEFILES}; do
     if [ -d "${source}/${SOURCEROOT}/${sourcefile}" ]; then
-       cp -vr ${source}/${SOURCEROOT}${sourcefile} $target/${sourcefile}
+       cp -pruv ${source}/${SOURCEROOT}${sourcefile} $target/${sourcefile}
     else
-        cp -v ${source}/${SOURCEROOT}${sourcefile} $target/${sourcefile}
+        cp -puv ${source}/${SOURCEROOT}${sourcefile} $target/${sourcefile}
     fi
 done
 echo "[+] Done"
