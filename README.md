@@ -33,7 +33,12 @@ You can set a variable  (`reject`) whether to reject the update when validation 
 
 There is currently one validator implemented in the `pre-receive` hook, the XML validator.
 
-## install / configure repositories
+## install / configure / update repositories
+
+### pull_upstream_changes.sh
+A script to update a repo with upstream changes.
+Sometimes you don't want to specify an upstream repository, but still want to pull and apply changes from an upstream source. This script allows you to specify which files can be safely updated by an upstream repo. It pulls the latest changes and applies them.
+Can be run from within a target directory, or by specifying the target as parameter.
 
 ### setuprepo.py
 A wrapper to execute one or multiple repetitive tasks:
