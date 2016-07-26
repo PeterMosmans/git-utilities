@@ -23,7 +23,7 @@ import xml.sax
 
 
 CONFIG_FILE = '.git/hooks/pre-commit.yml'
-VERSION = '0.4'
+VERSION = '0.5'
 
 
 def all_files():
@@ -138,6 +138,8 @@ def read_config(options):
             if contents and re.findall(r'{0}:\s?(.*)'.format(key), contents):
                 options[key] = re.findall(r'{0}:\s?(.*)'.format(key),
                                           contents)[0]
+                if options[key].lower() == 'false':
+                    options[key] = False
             else:
                 options[key] = False
     try:
