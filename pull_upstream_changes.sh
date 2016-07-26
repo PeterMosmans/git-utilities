@@ -20,7 +20,7 @@ SOURCEROOT=""
 
 
 ## Don't change anything below this line
-VERSION=0.6
+VERSION=0.7
 
 source=$(dirname $(readlink -f $0))
 target=$1
@@ -35,7 +35,7 @@ if [ -z "$target" ]; then
 fi
 
 # Check if the target actually contains the repository
-if [ ! -z ${FINGERPRINT} ] && [ ! -d $target/${FINGERPRINT} ]; then
+if [ ! -z ${FINGERPRINT} ] && [ ! -e $target/${FINGERPRINT} ]; then
    echo "[-] ${target} does not contain the correct repository"
    exit
 fi
@@ -48,9 +48,9 @@ pushd "$source" >/dev/null && git pull && popd >/dev/null
 echo "[*] Applying changes (if any)..."
 for sourcefile in ${SOURCEFILES}; do
     if [ -d "${source}/${SOURCEROOT}/${sourcefile}" ]; then
-       cp -pruv ${source}/${SOURCEROOT}/${sourcefile} $target/
+       cp -prv ${source}/${SOURCEROOT}/${sourcefile} $target/
     else
-        cp -puv ${source}/${SOURCEROOT}/${sourcefile} $target/${sourcefile}
+        cp -pv ${source}/${SOURCEROOT}/${sourcefile} $target/${sourcefile}
     fi
 done
 echo "[+] Done"
