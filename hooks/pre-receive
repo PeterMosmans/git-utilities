@@ -4,26 +4,27 @@
 Validates files when they are received and before they are updated
 by a git repository
 
-Copyright (C) 2015 Peter Mosmans [Go Forward]
+Copyright (C) 2015-2016 Peter Mosmans [Go Forward]
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 """
 
+from __future__ import print_function
 
 import subprocess
 import sys
 import xml.sax
 
 # When set to True, the update will be rejected when validation fails
-reject = True
+REJECT = True
 
 
 def main():
     """Receives hook parameters from git."""
-    (base, commit, ref) = sys.stdin.read().strip().split()
-    sys.exit(validate_files(received_files(base, commit), commit) and reject)
+    (base, commit, ref) = sys.stdin.read().strip().split() #pylint: disable=unused-variable
+    sys.exit(validate_files(received_files(base, commit), commit) and REJECT)
 
 
 def received_files(base, commit):
@@ -50,12 +51,10 @@ def validate_xml_file(filename, commit):
     cmd = ['git', 'show', '{0}:{1}'.format(commit, filename)]
     p = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
-    if p.stderr.read():  # for now, skip validation if file doesn't exist anymore
-        return return_value
     xml_string = p.stdout.read()
+    print("[+] validating XML file: {0}".format(filename))
     if not xml_string:  # for now, skip validation if file is empty
         return return_value
-    print("[+] validating XML file: {0}".format(filename))
     try:
         xml.sax.parseString(xml_string, xml.sax.ContentHandler())
     except xml.sax.SAXException as e:
