@@ -151,7 +151,7 @@ it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.'''))
     parser.add_argument('repo', type=str, help="""repository name""")
-    parser.add_argument('--config', action='store',
+    parser.add_argument('-c', '--config', action='store',
                         help='load config file')
     parser.add_argument('-r', '--remote', type=str, action='store',
                         help="""remote repository address""")
@@ -294,7 +294,7 @@ def print_status(text, verbose=False):
 
 def read_config(options):
     """
-    Reads parameters from @options['config'],  but doesn't overwrite non-empty
+    Read parameters from @options['config'], but don't supersede non-empty
     @options parameters.
 
     Returns: an array of options.
@@ -307,10 +307,12 @@ def read_config(options):
             contents = config_file.read()
             for key in ['namespace', 'notes', 'patchfile', 'remote', 'target',
                         'template']:
-                if not options[key] and \
-                   re.findall(r'{0}:\s?(.*)'.format(key), contents):
-                    options[key] = re.findall(r'{0}:\s?(.*)'.format(key),
-                                              contents)[0]
+                if not options[key]:
+                    if contents and re.findall(r'(?:^|\n){0}:\s?(.*)'.format(key), contents):
+                        options[key] = re.findall(r'(?:^|\n){0}:\s?(.*)'.format(key),
+                                                  contents)[0]
+                    if options[key] and options[key].lower() == 'false':
+                        options[key] = False
     except IOError as exception:
         print_error('Could not open configuration file {0}: {1}'.
                     format(filename, exception.strerror), -1)
