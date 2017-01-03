@@ -23,7 +23,7 @@ import xml.sax
 
 
 CONFIG_FILE = '.git/hooks/pre-commit.yml'
-VERSION = '0.5'
+VERSION = '0.6'
 
 
 def all_files():
@@ -212,7 +212,7 @@ def validate_python(filename, options):
                 result = True
             else:
                 result = False
-    except [IOError, IndexError] as exception:
+    except (IOError, IndexError) as exception:
         print('[-] could not parse {0} ({1})'.format(filename, exception))
         result = True
     return result
