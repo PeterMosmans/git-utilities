@@ -1,12 +1,12 @@
 diff -Nur original/.git/hooks/pre-commit modified/.git/hooks/pre-commit
 --- original/.git/hooks/pre-commit	1970-01-01 00:00:00.000000000 +0000
-+++ modified/.git/hooks/pre-commit	2016-04-15 03:51:49.410275700 +0000
-@@ -0,0 +1,257 @@
++++ modified/.git/hooks/pre-commit	2017-02-28 00:36:30.418243500 +0000
+@@ -0,0 +1,262 @@
 +#!/usr/bin/env python
 +# pylint: disable=invalid-name
 +
 +"""
-+Validates files before they are commited to a git repository
++Validates files before they are committed to a git repository
 +
 +Copyright (C) 2015-2016 Peter Mosmans [Go Forward]
 +This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,7 @@ diff -Nur original/.git/hooks/pre-commit modified/.git/hooks/pre-commit
 +
 +
 +CONFIG_FILE = '.git/hooks/pre-commit.yml'
-+VERSION = '0.2'
++VERSION = '0.6'
 +
 +
 +def all_files():
@@ -136,12 +136,14 @@ diff -Nur original/.git/hooks/pre-commit modified/.git/hooks/pre-commit
 +    except IOError as exception:
 +        print_error('Could not open configuration file {0}: {1}'.
 +                    format(options['config'], exception.strerror))
-+    for key in ['docbuilder', 'python', 'reject', 'treshold', 'verbose',
++    for key in ['docbuilder', 'python', 'reject', 'treshold', 'verbose', 'xml',
 +                'yaml']:
 +        if key not in options:
 +            if contents and re.findall(r'{0}:\s?(.*)'.format(key), contents):
 +                options[key] = re.findall(r'{0}:\s?(.*)'.format(key),
 +                                          contents)[0]
++                if options[key].lower() == 'false':
++                    options[key] = False
 +            else:
 +                options[key] = False
 +    try:
@@ -201,17 +203,20 @@ diff -Nur original/.git/hooks/pre-commit modified/.git/hooks/pre-commit
 +            process = subprocess.Popen(['pylint', filename],
 +                                       stdout=subprocess.PIPE, stderr=False)
 +            stdout = process.communicate()
-+            results = float(re.findall(r"Your code has been rated at ([\d\.]+)/10",
-+                                       str(stdout))[0])
-+            print_status('{0} has been rated {1}'.format(filename, results),
-+                         options['verbose'])
++            if stdout:
++                results = float(re.findall(r"Your code has been rated at (-?[\d\.]+)/10",
++                                           str(stdout))[0])
++                print_status('{0} has been rated {1}'.format(filename, results),
++                             options['verbose'])
++            else:
++                results = 0.0
 +            if results < float(options['treshold']):
 +                print_line('[-] score of {0} ({1}) is below treshold of {2}'.
 +                           format(filename, results, options['treshold']))
 +                result = True
 +            else:
 +                result = False
-+    except IOError as exception:
++    except (IOError, IndexError) as exception:
 +        print('[-] could not parse {0} ({1})'.format(filename, exception))
 +        result = True
 +    return result
@@ -261,11 +266,11 @@ diff -Nur original/.git/hooks/pre-commit modified/.git/hooks/pre-commit
 +    main()
 diff -Nur original/.git/hooks/pre-commit.yml modified/.git/hooks/pre-commit.yml
 --- original/.git/hooks/pre-commit.yml	1970-01-01 00:00:00.000000000 +0000
-+++ modified/.git/hooks/pre-commit.yml	2016-04-15 03:52:14.408466600 +0000
-@@ -0,0 +1,5 @@
++++ modified/.git/hooks/pre-commit.yml	2017-02-28 00:36:30.420243400 +0000
+@@ -0,0 +1,6 @@
 +python: True
 +reject: True
 +treshold: 10
 +verbose: True
++xml: True
 +yaml: True
-Binary files original/.git/index and modified/.git/index differ
