@@ -235,7 +235,7 @@ def validate_xml(filename, options):
     try:
         with open(filename, 'rb') as xml_file:
             defusedxml.sax.parse(xml_file, defusedxml.sax.ContentHandler())
-    except defusedxml.sax.SAXException as exception:
+    except Exception as exception:
         print('[-] validating {0} failed ({1})'.format(filename, exception))
         return_value = 1
     except IOError as exception:
