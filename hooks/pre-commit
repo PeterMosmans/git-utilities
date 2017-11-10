@@ -227,9 +227,7 @@ def validate_python(filename, options):
 
 
 def validate_xml(filename, options):
-    """
-    Validates XML file by trying to parse it.
-    """
+    """Validate XML file by trying to parse it."""
     return_value = 0
     if not options['xml']:
         return return_value
