@@ -19,11 +19,19 @@ from __future__ import print_function
 import re
 import subprocess
 import sys
-import xml.sax
+
+try:
+    import defusedxml
+except ImportError as exception:
+    print('This script needs external pip libraries: {0}'.format(exception),
+          file=sys.stderr)
+    print('Install the missing libraries using pip -r requirements.txt',
+          file=sys.stderr)
+    sys.exit(-1)
 
 
 CONFIG_FILE = '.git/hooks/pre-commit.yml'
-VERSION = '0.6'
+VERSION = '0.7'
 
 
 def all_files():
@@ -228,8 +236,8 @@ def validate_xml(filename, options):
     print("[+] validating XML file: {0}".format(filename))
     try:
         with open(filename, 'rb') as xml_file:
-            xml.sax.parse(xml_file, xml.sax.ContentHandler())
-    except xml.sax.SAXException as exception:
+            defusedxml.sax.parse(xml_file, defusedxml.sax.ContentHandler())
+    except defusedxml.sax.SAXException as exception:
         print('[-] validating {0} failed ({1})'.format(filename, exception))
         return_value = 1
     except IOError as exception:

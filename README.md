@@ -7,7 +7,17 @@ A collection of handy git hooks / scripts
 ### hooks/pre-commit
 This hook is for a local repository, and fires when committing to the repo. It validates files before they are committed.
 
-There are currently three validators implemented: An XML validator, a YAML validator and a Python validator. The Python validator executes pylint, and you can specify a minimum pylint score.
+There are currently three validators implemented: An XML validator, a YAML
+validator and a Python validator.
+The Python validator executes pylint, and you can specify a minimum pylint
+score.
+
+The XML validator needs the external `defusedxml` pip library, as that is a
+safer alternative than the built-in `xml` library. Install `defusedxml` using
+
+```
+pip install -r requirements.txt
+```
 
 The configuration can be specified in the file `.git/hooks/pre-commit.yml`:
 ```
