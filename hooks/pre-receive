@@ -74,11 +74,11 @@ def validate_xml_file(filename, commit):
         return return_value
     try:
         defusedxml.sax.parseString(xml_string, defusedxml.sax.ContentHandler())
-    except defusedxml.sax.SAXException as exception:
-        print('[-] validating {0} failed: {1}'.format(filename, exception))
-        return_value = 1
     except IOError as exception:
         print('[-] could not open {0}: {1}'.format(filename, exception))
+        return_value = 1
+    except Exception as exception:
+        print('[-] validating {0} failed: {1}'.format(filename, exception))
         return_value = 1
     return return_value
 
