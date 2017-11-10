@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
-"""
-Validates files when they are received and before they are updated
+"""Validate files when they are received and before they are updated
 by a git repository
 
-Copyright (C) 2015-2016 Peter Mosmans [Go Forward]
+Copyright (C) 2015-2017 Peter Mosmans [Go Forward]
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -15,7 +14,16 @@ from __future__ import print_function
 
 import subprocess
 import sys
-import xml.sax
+
+try:
+    import defusedxml
+except ImportError as exception:
+    print('This script needs external pip libraries: {0}'.format(exception),
+          file=sys.stderr)
+    print('Install the missing libraries using pip -r requirements.txt',
+          file=sys.stderr)
+    sys.exit(-1)
+
 
 # When set to True, the update will be rejected when validation fails
 REJECT = True
@@ -46,7 +54,7 @@ def validate_files(filenames, commit):
 
 
 def validate_xml_file(filename, commit):
-    """Validates XML file by trying to parse it."""
+    """Validate XML file by trying to parse it."""
     return_value = 0
     cmd = ['git', 'show', '{0}:{1}'.format(commit, filename)]
     p = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE,
@@ -56,12 +64,12 @@ def validate_xml_file(filename, commit):
     if not xml_string:  # for now, skip validation if file is empty
         return return_value
     try:
-        xml.sax.parseString(xml_string, xml.sax.ContentHandler())
-    except xml.sax.SAXException as e:
-        print('[-] validating {0} failed ({1})'.format(filename, e))
+        defusedxml.sax.parseString(xml_string, defusedxml.sax.ContentHandler())
+    except defusedxml.sax.SAXException as exception:
+        print('[-] validating {0} failed: {1}'.format(filename, exception))
         return_value = 1
-    except:
-        print('[-] could not open {0}'.format(filename))
+    except IOError as exception:
+        print('[-] could not open {0}: {1}'.format(filename, exception))
         return_value = 1
     return return_value
 
