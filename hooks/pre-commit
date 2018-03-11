@@ -31,27 +31,19 @@ except ImportError as exception:
 
 
 CONFIG_FILE = '.git/hooks/pre-commit.yml'
-VERSION = '0.7'
+VERSION = '0.8'
 
 
 def all_files():
-    """
-    Returns a list of all files.
-    """
+    """Return a list of all files."""
     cmd = ['git', 'ls-files']
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                stderr=False)
     return process.stdout.read().splitlines()
 
 
-def execute_command(cmd, verbose=False):
-    """
-    Executes command @cmd
-    Shows output when @verbose is True
-
-    Returns: False if command failed
-    """
-    stderr = ''
+def execute_command(cmd):
+    """Execute command @cmd."""
     try:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
@@ -59,18 +51,13 @@ def execute_command(cmd, verbose=False):
         result = process.returncode
     except OSError as exception:
         result = -1
-        print_error('could not execute {0}'.format(cmd))
-        print_error(format(exception.strerror))
-    if (result != 0) and verbose:
-        print_error(stderr)
-    print_status(stdout, verbose)
+        print('could not execute {0}: {1}'.format(cmd, exception.strerror), file=sys.stderr)
+    print(stdout)
     return result == 0
 
 
 def is_python(filename):
-    """
-    Returns: True if @filename is a Python script
-    """
+    """Return True if @filename is a Python script."""
     result = False
     try:
         with open(filename, 'r') as python_file:
@@ -82,9 +69,7 @@ def is_python(filename):
 
 
 def main():
-    """
-    The main program.
-    """
+    """The main program."""
     options = {'config': CONFIG_FILE}
     options = read_config(options)
     if len(sys.argv) > 1:
@@ -94,52 +79,15 @@ def main():
     sys.exit(validate_files(staged_files(), options) and options['reject'])
 
 
-def print_error(text, result=False):
-    """
-    Prints error message @text and exits with result code @result if not 0.
-    """
-    if len(text):
-        print_line('[-] ' + text, True)
-    if result:
-        sys.exit(result)
-
-
-def print_line(text, error=False):
-    """
-    Prints @text to stdout, or to stderr if @error is True.
-    Flushes stdout and stdin.
-    """
-    if text:
-        if not error:
-            print(text)
-        else:
-            print(text, file=sys.stderr)
-    sys.stdout.flush()
-    sys.stderr.flush()
-
-
-def print_status(text, verbose=False):
-    """
-    Prints status message @text if @verbose is True
-    """
-    if verbose and text:
-        print_line('[*] ' + text)
-
-
 def read_config(options):
-    """
-    Reads parameters from @options['config'],  but doesn't overwrite non-empty
-    @options parameters.
-
-    Returns: an array of options.
-    """
+    """Read parameters from @options['config'], but do not overwrite non-empty parameters."""
     contents = False
     try:
         with open(options['config'], 'r') as config_file:
             contents = config_file.read()
     except IOError as exception:
-        print_error('Could not open configuration file {0}: {1}'.
-                    format(options['config'], exception.strerror))
+        print('Could not open configuration file {0}: {1}'.
+              format(options['config'], exception.strerror), file=sys.stderr)
     for key in ['docbuilder', 'python', 'reject', 'treshold', 'verbose', 'xml',
                 'yaml']:
         if key not in options:
@@ -154,29 +102,25 @@ def read_config(options):
         options['treshold'] = float(options['treshold'])
     except ValueError:
         options['treshold'] = 0
-        print_error('treshold should be a float, disabling')
+        print('treshold should be a float, disabling', file=sys.stderr)
     if options['yaml']:
         try:
             import yaml
         except ImportError:
-            print_error('could not import yaml, disabling validation')
+            print('could not import yaml, disabling validation', file=sys.stderr)
             options['yaml'] = False
     return options
 
 
 def staged_files():
-    """
-    Returns a list of all modified and added staged files.
-    """
+    """Return a list of all modified and added staged files."""
     cmd = ['git', 'diff', '--staged', '--name-only', '--diff-filter', 'AM']
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
     return process.stdout.read().splitlines()
 
 
 def validate_files(filenames, options):
-    """
-    Checks file extensions and calls appropriate validator function.
-    """
+    """Check file extensions and call appropriate validator function."""
     return_value = 0
     for filename in filenames:
         if options['python']:
@@ -193,16 +137,12 @@ def validate_files(filenames, options):
 
 
 def validate_python(filename, options):
-    """
-    Validates Python file by running pylint on it.
-
-    Returns 0 if validated succsesfully.
-    """
+    """Validate Python file by running pylint on it."""
     if not options['python'] and not options['treshold']:
         return 0
     print("[+] validating Python file using pylint: {0}".format(filename))
     try:
-        result = execute_command(['pylint', '-E', filename], options['verbose'])
+        result = execute_command(['pylint', '-E', filename])
         if options['treshold']:
             process = subprocess.Popen(['pylint', filename],
                                        stdout=subprocess.PIPE, stderr=False)
@@ -210,18 +150,17 @@ def validate_python(filename, options):
             if stdout:
                 results = float(re.findall(r"Your code has been rated at (-?[\d\.]+)/10",
                                            str(stdout))[0])
-                print_status('{0} has been rated {1}'.format(filename, results),
-                             options['verbose'])
+                print('{0} has been rated {1}'.format(filename, results))
             else:
                 results = 0.0
             if results < float(options['treshold']):
-                print_line('[-] score of {0} ({1}) is below treshold of {2}'.
-                           format(filename, results, options['treshold']))
+                print('[-] score of {0} ({1}) is below treshold of {2}'.
+                      format(filename, results, options['treshold']))
                 result = True
             else:
                 result = False
     except (IOError, IndexError) as exception:
-        print('[-] could not parse {0} ({1})'.format(filename, exception))
+        print('[-] could not parse {0} ({1})'.format(filename, exception), file=sys.stderr)
         result = True
     return result
 
@@ -235,26 +174,24 @@ def validate_xml(filename, options):
     try:
         with open(filename, 'rb') as xml_file:
             defusedxml.sax.parse(xml_file, defusedxml.sax.ContentHandler())
-    except Exception as exception:
-        print('[-] validating {0} failed ({1})'.format(filename, exception))
-        return_value = 1
     except IOError as exception:
         print('[-] could not parse {0} ({1})'.format(filename, exception))
+        return_value = 1
+    except Exception as exception:
+        print('[-] validating {0} failed ({1})'.format(filename, exception))
         return_value = 1
     return return_value
 
 
 def validate_yaml(filename, options):
-    """
-    Validates YAML file by trying to load it.
-    """
+    """Validate YAML file by trying to load it."""
     return_value = 0
     if not options['yaml']:
         return return_value
     import yaml
     print("[+] validating YAML file: {0}".format(filename))
     try:
-        yaml.load(open(filename), Loader=yaml.Loader)
+        yaml.safe_load(open(filename))
     except yaml.YAMLError as exception:
         print('[-] validating {0} failed ({1})'.format(filename, exception))
         return_value = 1
