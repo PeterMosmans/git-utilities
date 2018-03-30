@@ -48,7 +48,7 @@ def execute_command(cmd):
     try:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        stdout, stderr = process.communicate()
+        stdout = process.communicate()
         result = process.returncode
     except OSError as exception:
         result = -1
@@ -106,7 +106,7 @@ def read_config(options):
         print('treshold should be a float, disabling', file=sys.stderr)
     if options['yaml']:
         try:
-            import yaml
+            import yaml  # pylint: disable=unused-variable
         except ImportError:
             print('could not import yaml, disabling validation', file=sys.stderr)
             options['yaml'] = False
