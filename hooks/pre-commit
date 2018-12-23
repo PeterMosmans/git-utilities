@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # pylint: disable=invalid-name
 
 """Validate files before they are committed to a git repository.
@@ -32,7 +32,7 @@ except ImportError as exception:
 
 
 CONFIG_FILE = '.git/hooks/pre-commit.yml'
-VERSION = '0.9'
+VERSION = '1.0'
 
 
 def all_files():
@@ -125,14 +125,14 @@ def validate_files(filenames, options):
     return_value = 0
     for filename in filenames:
         if options['python']:
-            if filename.lower().endswith('.py') or is_python(filename):
+            if filename.lower().endswith(b'.py') or is_python(filename):
                 return_value = validate_python(filename, options) or \
                                return_value
-        if (filename.lower().endswith('.xml') or
-                filename.lower().endswith('xml"')):
+        if (filename.lower().endswith(b'.xml') or
+                filename.lower().endswith(b'xml"')):
             return_value = validate_xml(filename, options) or return_value
-        if (filename.lower().endswith('.yaml') or
-                filename.lower().endswith('yml')):
+        if (filename.lower().endswith(b'.yaml') or
+                filename.lower().endswith(b'yml')):
             return_value = validate_yaml(filename, options) or return_value
     return return_value
 
